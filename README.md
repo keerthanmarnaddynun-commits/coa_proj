@@ -48,7 +48,7 @@ Trace-driven study of first-order Markov page prefetching for a parallel (OpenMP
 
 Each experiment takes about 5 to 35 seconds.
 
-UI: double-click `ui/run_ui.bat` (opens http://localhost:8000). UI tests, from the `ui` folder: `node tests/verify_sim.mjs` and `node tests/verify_scenarios.mjs`. UI data export, from the project root: `python ui/export_ui_data.py`.
+UI: from the project root run `.\ui\run_ui.bat` in PowerShell (or `ui\run_ui.bat` in Command Prompt), or double-click `ui/run_ui.bat`. It opens http://localhost:8000; press Ctrl+C in the terminal to stop the server. UI tests, from the `ui` folder: `node tests/verify_sim.mjs` and `node tests/verify_scenarios.mjs`. UI data export, from the project root: `python ui/export_ui_data.py`.
 
 C trace generator: see `pp/README.md` (build with `make` inside `pp/`).
 
