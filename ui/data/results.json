@@ -1,0 +1,429 @@
+{
+  "overview": {
+    "traceA": {
+      "name": "Trace A",
+      "references": 3780309,
+      "distinct_pages": 2025,
+      "page_size_kb": 4,
+      "baseline_1024_faults": 67696
+    },
+    "traceB": {
+      "name": "Trace B (thread-tagged)",
+      "threads": 22,
+      "page_size_kb": 4,
+      "baseline_1024_faults": 66979
+    }
+  },
+  "experiments": {
+    "E1": {
+      "id": "E1",
+      "title": "Prefetch Degree Sensitivity (k = 1 to 5)",
+      "trace": "Trace A",
+      "capacity": 1024,
+      "what_tested": "Evaluated prefetch degrees k = 1, 2, 3, 5 with 1st-order Markov model on 1,024 RAM frames.",
+      "what_found": "Top-3 gave the largest saving of the degrees tested (15.04% fewer faults). Top-5 saved less (+6.88%); one possible cause is that extra low-probability pages displace resident ones, which we did not test.",
+      "runnable": true,
+      "preset": "top3",
+      "table": [
+        {
+          "k": "Baseline (k=0)",
+          "faults": 67696,
+          "reduction": "0.00%",
+          "notes": "Standard LRU Demand Paging"
+        },
+        {
+          "k": "Top-1 (k=1)",
+          "faults": 67634,
+          "reduction": "+0.09%",
+          "notes": "Insufficient coverage"
+        },
+        {
+          "k": "Top-2 (k=2)",
+          "faults": 63132,
+          "reduction": "+6.74%",
+          "notes": "Moderate gain"
+        },
+        {
+          "k": "Top-3 (k=3)",
+          "faults": 57512,
+          "reduction": "+15.04%",
+          "notes": "Best of the degrees tested"
+        },
+        {
+          "k": "Top-5 (k=5)",
+          "faults": 63041,
+          "reduction": "+6.88%",
+          "notes": "Pollution begins; 5,529 faults worse than Top-3"
+        }
+      ]
+    },
+    "E2": {
+      "id": "E2",
+      "title": "2nd-Order Markov Transition Model",
+      "trace": "Trace A",
+      "capacity": 1024,
+      "what_tested": "Evaluated 2nd-order Markov model P(p_t | p_{t-1}, p_{t-2}) to test whether longer history improves prediction.",
+      "what_found": "Negative result: the 2nd-order model made more faults than baseline at k=2, 3 and 5 (up to 1.10% worse). Its table has 403,006 states against 2,025 for the 1st-order model. We did not test why it does worse; sparse statistics and thread interleaving are possible causes.",
+      "runnable": false,
+      "table": [
+        {
+          "config": "Baseline LRU",
+          "faults": 67696,
+          "reduction": "0.00%",
+          "states": 2025
+        },
+        {
+          "config": "2nd-Order k=1",
+          "faults": 67578,
+          "reduction": "+0.17%",
+          "states": 403006
+        },
+        {
+          "config": "2nd-Order k=2",
+          "faults": 67928,
+          "reduction": "-0.34%",
+          "states": 403006
+        },
+        {
+          "config": "2nd-Order k=3",
+          "faults": 68245,
+          "reduction": "-0.81%",
+          "states": 403006
+        },
+        {
+          "config": "2nd-Order k=5",
+          "faults": 68441,
+          "reduction": "-1.10%",
+          "states": 403006
+        }
+      ]
+    },
+    "E3": {
+      "id": "E3",
+      "title": "RAM Capacity Sensitivity (512 to 2,048 Frames)",
+      "trace": "Trace A",
+      "k": 3,
+      "what_tested": "Evaluated Top-3 Markov prefetching across memory constraints: 512 frames (2 MB), 1,024 frames (4 MB), 2,048 frames (8 MB).",
+      "what_found": "At 512 frames, prefetching caused severe pollution and made faults 7.26% worse (221,603 -> 237,684). At 2,048 frames, abundant headroom yielded a 53.83% fault reduction (2,025 -> 935).",
+      "runnable": true,
+      "preset": "512-hurts",
+      "table": [
+        {
+          "capacity": "512 frames (2 MB)",
+          "baseline": 221603,
+          "prefetch": 237684,
+          "reduction": "-7.26%",
+          "effect": "Severe pollution (harmful)"
+        },
+        {
+          "capacity": "1,024 frames (4 MB)",
+          "baseline": 67696,
+          "prefetch": 57512,
+          "reduction": "+15.04%",
+          "effect": "Gain at this size"
+        },
+        {
+          "capacity": "2,048 frames (8 MB)",
+          "baseline": 2025,
+          "prefetch": 935,
+          "reduction": "+53.83%",
+          "effect": "Cuts compulsory faults"
+        }
+      ]
+    },
+    "E4": {
+      "id": "E4",
+      "title": "Confidence Threshold Filtering",
+      "trace": "Trace A",
+      "capacity": 1024,
+      "k": 3,
+      "what_tested": "Filtered speculative prefetch candidates by transition probability threshold T in [0.00, 0.05, 0.10, 0.20, 0.30, 0.50].",
+      "what_found": "Filtering low-probability tail transitions at T=0.10 yielded peak fault reduction (+17.65%, 55,751 faults), saving 1,761 more faults than unconditional Top-3 while issuing 7,382 fewer prefetches.",
+      "runnable": true,
+      "preset": "fix1",
+      "table": [
+        {
+          "threshold": "0.00 (Unconditional)",
+          "faults": 57512,
+          "reduction": "+15.04%",
+          "prefetches": 56721,
+          "precision": "59.13%",
+          "waste": "40.81%"
+        },
+        {
+          "threshold": "0.05",
+          "faults": 55816,
+          "reduction": "+17.55%",
+          "prefetches": 50258,
+          "precision": "62.84%",
+          "waste": "37.11%"
+        },
+        {
+          "threshold": "0.10 (fewest faults)",
+          "faults": 55751,
+          "reduction": "+17.65%",
+          "prefetches": 49339,
+          "precision": "63.29%",
+          "waste": "36.65%"
+        },
+        {
+          "threshold": "0.20",
+          "faults": 59431,
+          "reduction": "+12.21%",
+          "prefetches": 32463,
+          "precision": "65.34%",
+          "waste": "34.60%"
+        },
+        {
+          "threshold": "0.30",
+          "faults": 67667,
+          "reduction": "+0.04%",
+          "prefetches": 38,
+          "precision": "86.84%",
+          "waste": "13.16%"
+        },
+        {
+          "threshold": "0.50",
+          "faults": 67683,
+          "reduction": "+0.02%",
+          "prefetches": 14,
+          "precision": "92.86%",
+          "waste": "7.14%"
+        }
+      ]
+    },
+    "E5": {
+      "id": "E5",
+      "title": "Prefetch-Aware LRU Insertion (LRU-End Insertion)",
+      "trace": "Trace A",
+      "k": 3,
+      "what_tested": "Evaluated inserting prefetched speculative pages at the LRU position instead of the MRU position under memory pressure.",
+      "what_found": "Turned the 512-frame loss of -7.26% (237,684 faults) into +13.54% (191,587 faults), saving 46,097 faults compared with MRU insertion. The gain mixes two effects that were not separated: prefetched pages go to the LRU end, and predicted pages that are already resident are not moved to the MRU end.",
+      "runnable": true,
+      "preset": "fix2",
+      "table": [
+        {
+          "capacity": "512 frames (2 MB)",
+          "baseline": 221603,
+          "mru_faults": 237684,
+          "mru_red": "-7.26%",
+          "lru_faults": 191587,
+          "lru_red": "+13.54%"
+        },
+        {
+          "capacity": "1,024 frames (4 MB)",
+          "baseline": 67696,
+          "mru_faults": 57512,
+          "mru_red": "+15.04%",
+          "lru_faults": 60622,
+          "lru_red": "+10.45%"
+        }
+      ]
+    },
+    "E6": {
+      "id": "E6",
+      "title": "Closed-Loop Adaptive Top-K Controller",
+      "trace": "Trace A",
+      "what_tested": "Evaluated online dynamic adjustment of k every 1,000 faults based on interval precision and waste.",
+      "what_found": "Autonomous memory protection: at 512 frames, detected high waste (>0.50) and throttled k down to 2 (159 adjustments), turning -7.26% loss into +4.29% reduction (212,106 faults). At 1,024 frames, expanded k to 5 (57,609 faults, +14.90%).",
+      "runnable": true,
+      "preset": "fix3",
+      "table": [
+        {
+          "capacity": "512 frames (2 MB)",
+          "baseline": 221603,
+          "adaptive_faults": 212106,
+          "reduction": "+4.29%",
+          "adjustments": 159,
+          "final_k": 2
+        },
+        {
+          "capacity": "1,024 frames (4 MB)",
+          "baseline": 67696,
+          "adaptive_faults": 57609,
+          "reduction": "+14.90%",
+          "adjustments": 6,
+          "final_k": 5
+        },
+        {
+          "capacity": "2,048 frames (8 MB)",
+          "baseline": 2025,
+          "adaptive_faults": 935,
+          "reduction": "+53.83%",
+          "adjustments": 0,
+          "final_k": 3
+        }
+      ]
+    },
+    "E7": {
+      "id": "E7",
+      "title": "Adaptive Replacement Cache (ARC) vs LRU Baseline",
+      "trace": "Trace A",
+      "what_tested": "Evaluated Megiddo & Modha's Adaptive Replacement Cache (ARC) with frequency + recency ghost lists against standard LRU without prefetching.",
+      "what_found": "ARC gave no gain over LRU (-0.36% at 512 frames, -0.01% at 1,024, 0.00% at 2,048). Its target parameter p stayed at 0, so it behaved like LRU on this trace. We did not test why.",
+      "runnable": false,
+      "table": [
+        {
+          "capacity": "512 frames",
+          "lru_faults": 221603,
+          "arc_faults": 222408,
+          "difference": "-0.36%",
+          "notes": "ARC p stays 0"
+        },
+        {
+          "capacity": "1,024 frames",
+          "lru_faults": 67696,
+          "arc_faults": 67702,
+          "difference": "-0.01%",
+          "notes": "ARC p stays 0"
+        },
+        {
+          "capacity": "2,048 frames",
+          "lru_faults": 2025,
+          "arc_faults": 2025,
+          "difference": "0.00%",
+          "notes": "Identical"
+        }
+      ]
+    },
+    "E8": {
+      "id": "E8",
+      "title": "Graph-Aware Topological Oracle vs Statistical Markov",
+      "trace": "Trace A",
+      "capacity": 1024,
+      "k": 3,
+      "what_tested": "Compared statistical Markov prefetching against a Graph Oracle that prefetches direct graph neighbors from the CSR adjacency matrix.",
+      "what_found": "The graph oracle reached 57,230 faults (+15.46%), 282 faults (0.42 points) fewer than the Markov table (57,512, +15.04%). The Markov saving of 10,184 faults is 97.3% of the oracle's saving of 10,466 faults. The oracle is built from the whole graph with page numbers copied from this trace's layout, so it is not independent and is a reference point, not a proven upper bound.",
+      "runnable": true,
+      "preset": "oracle",
+      "table": [
+        {
+          "policy": "Baseline LRU (No Prefetch)",
+          "faults": 67696,
+          "reduction": "0.00%",
+          "type": "Demand Paging"
+        },
+        {
+          "policy": "Statistical Top-3 Markov",
+          "faults": 57512,
+          "reduction": "+15.04%",
+          "type": "Empirical Trace History"
+        },
+        {
+          "policy": "Graph Topological Oracle Top-3",
+          "faults": 57230,
+          "reduction": "+15.46%",
+          "type": "Ground-Truth Adjacency"
+        }
+      ]
+    },
+    "E9": {
+      "id": "E9",
+      "title": "Per-Thread Markov vs Global Markov",
+      "trace": "Trace B (thread-tagged)",
+      "capacity": 1024,
+      "k": 3,
+      "what_tested": "Evaluated per-thread Markov models (22 separate transition tables) to test whether separating thread interleaved streams reduces entropy.",
+      "what_found": "Negative result: Per-thread Top-3 (+12.44%, 58,650 faults) did worse than Global Top-3 (+14.13%, 57,512 faults). The per-thread tables hold 44,398 states against 2,025 for the global table. We did not test why the split model does worse; thinner transition counts and BFS frontiers shared across threads are possible causes.",
+      "runnable": false,
+      "table": [
+        {
+          "model": "Baseline LRU",
+          "faults": 66979,
+          "reduction": "0.00%",
+          "states": 2025
+        },
+        {
+          "model": "Global Top-3 Markov",
+          "faults": 57512,
+          "reduction": "+14.13%",
+          "states": 2025
+        },
+        {
+          "model": "Per-Thread Top-3 Markov (22 threads)",
+          "faults": 58650,
+          "reduction": "+12.44%",
+          "states": 44398
+        }
+      ]
+    },
+    "E10": {
+      "id": "E10",
+      "title": "Page Size Sensitivity under Fixed 4 MB RAM",
+      "trace": "Trace B",
+      "ram_size": "4 MB",
+      "what_tested": "Evaluated impact of page granularity (2 KB, 4 KB, 8 KB, 16 KB) under fixed 4 MB physical RAM allocation.",
+      "what_found": "The reduction does not rise steadily with page size: +14.68% at 2 KB, +14.13% at 4 KB, +15.28% at 8 KB and +15.83% at 16 KB. The Markov table shrinks from 4,049 states at 2 KB to 511 at 16 KB. We did not test why 4 KB is the lowest.",
+      "runnable": false,
+      "table": [
+        {
+          "page_size": "2 KB",
+          "frames": 2048,
+          "baseline": 68658,
+          "prefetch": 58580,
+          "reduction": "+14.68%",
+          "states": 4049
+        },
+        {
+          "page_size": "4 KB",
+          "frames": 1024,
+          "baseline": 66979,
+          "prefetch": 57512,
+          "reduction": "+14.13%",
+          "states": 2025
+        },
+        {
+          "page_size": "8 KB",
+          "frames": 512,
+          "baseline": 66586,
+          "prefetch": 56414,
+          "reduction": "+15.28%",
+          "states": 1016
+        },
+        {
+          "page_size": "16 KB",
+          "frames": 256,
+          "baseline": 66699,
+          "prefetch": 56141,
+          "reduction": "+15.83%",
+          "states": 511
+        }
+      ]
+    },
+    "E11": {
+      "id": "E11",
+      "title": "Write-Back Overhead & Total Eviction Cost",
+      "trace": "Trace B",
+      "capacity": 1024,
+      "what_tested": "Charged total I/O cost = page faults + dirty page evictions to account for write-back disk penalties.",
+      "what_found": "Prefetching increased total frame evictions from 65,955 to 113,643 and dirty evictions from 1,871 to 2,620. Because demand faults fell by 9,467, the combined cost still improved by +12.66% (68,850 -> 60,132 cost units). This cost counts faults and dirty evictions but does not charge the prefetch reads. The gain disappears if one prefetch read costs more than about 0.15 of a demand-fault read (8,718 cost units saved / 57,155 prefetches issued = 0.1525).",
+      "runnable": false,
+      "table": [
+        {
+          "metric": "Page Faults",
+          "baseline": 66979,
+          "top3": 57512,
+          "change": "-9,467 (-14.13%)"
+        },
+        {
+          "metric": "Dirty Page Evictions",
+          "baseline": 1871,
+          "top3": 2620,
+          "change": "+749 (+40.03%)"
+        },
+        {
+          "metric": "Total Combined Cost (Faults + Dirty Evictions)",
+          "baseline": 68850,
+          "top3": 60132,
+          "change": "-8,718 (12.66% lower cost)"
+        },
+        {
+          "metric": "Total Cache Evictions",
+          "baseline": 65955,
+          "top3": 113643,
+          "change": "+47,688 (+72.30%)"
+        }
+      ]
+    }
+  }
+}

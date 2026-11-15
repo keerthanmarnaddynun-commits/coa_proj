@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pollution-Aware Markov Page Prefetching | COA Class Presentation</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="file-protocol-warning" style="display:none; padding:12px 16px; margin:12px; border:2px solid var(--color-harm); border-radius:6px; font-weight:600;">
+    This page must be opened through a local server. Close this tab and double-click run_ui.bat; it opens http://localhost:8000.
+  </div>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <h1>Pollution-Aware Markov Page Prefetching</h1>
+        <span class="brand-badge">COA Project</span>
+      </div>
+
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="problem">1. The Problem</button>
+        <button class="nav-tab" data-tab="walkthrough">2. Concept Walkthrough</button>
+        <button class="nav-tab" data-tab="live">3. Live Simulator</button>
+        <button class="nav-tab" data-tab="experiments">4. Experiments (E1-E11)</button>
+        <button class="nav-tab" data-tab="takeaways">5. Takeaways & Limits</button>
+      </nav>
+
+      <div class="header-controls">
+        <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: THE PROBLEM (Overview)                                             -->
+    <!-- ========================================================================= -->
+    <section id="tab-problem" class="tab-pane active">
+      <!-- Presenter Notes -->
+      <details class="presenter-notes" open>
+        <summary class="presenter-notes-summary">
+          <span>🎤 Presenter Notes (Tab 1: Overview)</span>
+          <span style="font-size:0.8rem; font-weight:normal;">Click to collapse</span>
+        </summary>
+        <div class="presenter-notes-content">
+          <ul>
+            <li><strong>The Core Bottleneck:</strong> In virtual memory systems, a page fault triggers disk/SSD I/O requiring millions of CPU cycles (~8 ms) versus ~100 ns for a RAM access (an 80,000x latency penalty).</li>
+            <li><strong>Why Graph Traversal is Hard:</strong> Parallel BFS over sparse graphs (e.g. Amazon0302 co-purchasing graph) exhibits irregular, data-dependent memory access patterns that defeat standard hardware stride prefetchers.</li>
+            <li><strong>The Danger of Speculation (Cache Pollution):</strong> While 1st-order Markov prefetching can mask miss latency, speculative wrong guesses evict active working set pages, raising page faults when free memory is limited.</li>
+            <li><strong>Architectural Remedies:</strong> We demonstrate three orthogonal pollution remedies: confidence thresholding (T=0.10), LRU-end insertion (prefetch-aware LRU), and closed-loop adaptive degree control.</li>
+          </ul>
+        </div>
+      </details>
+
+      <h2 class="section-title">The Challenge: Virtual Memory Latency vs Cache Pollution</h2>
+      <p class="section-subtitle">
+        In Computer Organization & Architecture, demand paging waits until a memory miss halts CPU execution. Prefetching fetches speculative pages early to hide latency, but inaccurate predictions cause <em>cache pollution</em>—flushing active working set frames.
+      </p>
+
+      <!-- Headline Cards -->
+      <div class="grid-4" style="margin-bottom: 24px;">
+        <div class="stat-card good">
+          <div>
+            <div class="tag-badge" style="margin-bottom:8px;">Trace A • 1,024 Frames</div>
+            <div class="stat-value prefetch">+15.04%</div>
+            <div class="stat-label">Top-3 Markov Prefetching</div>
+          </div>
+          <div class="stat-subtext">Best of the degrees tested (67,696 → 57,512 faults). Saves 10,184 page faults.</div>
+        </div>
+
+        <div class="stat-card bad">
+          <div>
+            <div class="tag-badge" style="margin-bottom:8px;">Trace A • 512 Frames</div>
+            <div class="stat-value harm">-7.26%</div>
+            <div class="stat-label">Cache Pollution (Worse!)</div>
+          </div>
+          <div class="stat-subtext">Under memory pressure, MRU prefetching displaces active frames (221,603 → 237,684 faults).</div>
+        </div>
+
+        <div class="stat-card good">
+          <div>
+            <div class="tag-badge" style="margin-bottom:8px;">Trace A • 1,024 Frames</div>
+            <div class="stat-value prefetch">+17.65%</div>
+            <div class="stat-label">Confidence Filter (T=0.10)</div>
+          </div>
+          <div class="stat-subtext">Peak reduction (55,751 faults). Filters tail noise, issuing 7,382 fewer prefetches.</div>
+        </div>
+
+        <div class="stat-card good">
+          <div>
+            <div class="tag-badge" style="margin-bottom:8px;">Trace A • 512 Frames</div>
+            <div class="stat-value prefetch">+13.54%</div>
+            <div class="stat-label">LRU-End Insertion Fix</div>
+          </div>
+          <div class="stat-subtext">Turns the 512-frame loss into a gain (191,587 faults), 46,097 fewer than MRU prefetching.</div>
+        </div>
+      </div>
+
+      <!-- Architectural Pipeline Diagram -->
+      <div class="card">
+        <div class="card-title">
+          <span>Architectural Pipeline: Closed-Loop Pollution-Aware Prefetching</span>
+          <span class="tag-badge">Parallel BFS on Amazon0302</span>
+        </div>
+
+        <div class="pipeline-container">
+          <div class="pipeline-node">
+            <div class="pipeline-node-icon">🧵</div>
+            <div class="pipeline-node-title">Application Threads</div>
+            <div class="pipeline-node-desc">Parallel BFS on SNAP Amazon0302 CSR graph</div>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <div class="pipeline-node">
+            <div class="pipeline-node-icon">⚠️</div>
+            <div class="pipeline-node-title">Page-Fault Handler</div>
+            <div class="pipeline-node-desc">Demand miss triggers kernel OS handler</div>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <div class="pipeline-node active-node">
+            <div class="pipeline-node-icon">📊</div>
+            <div class="pipeline-node-title">1st-Order Markov Table</div>
+            <div class="pipeline-node-desc">Look up transition probabilities P(q | p)</div>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <div class="pipeline-node active-node">
+            <div class="pipeline-node-icon">🛡️</div>
+            <div class="pipeline-node-title">Confidence Filter</div>
+            <div class="pipeline-node-desc">Prune speculative pages with P(q | p) &lt; T</div>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <div class="pipeline-node active-node">
+            <div class="pipeline-node-icon">📥</div>
+            <div class="pipeline-node-title">Prefetch-Aware Insertion</div>
+            <div class="pipeline-node-desc">Insert speculative pages at LRU-end (not MRU)</div>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <div class="pipeline-node">
+            <div class="pipeline-node-icon">💾</div>
+            <div class="pipeline-node-title">RAM Frames (LRU)</div>
+            <div class="pipeline-node-desc">Physical memory frame allocation</div>
+          </div>
+        </div>
+
+        <div class="pipeline-feedback">
+          <span style="font-size:1.2rem;">🔄</span>
+          <div>
+            <strong>Adaptive Top-K Controller Feedback Loop:</strong> Samples prefetch hits and evictions every 1,000 page faults.
+            If <code>waste_rate &gt; 0.50</code>, throttles <code>k--</code> (down to 0); if <code>hit_rate &gt; 0.60</code>, expands <code>k++</code> (up to 5).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: CONCEPT WALKTHROUGH (Teaching Simulator)                           -->
+    <!-- ========================================================================= -->
+    <section id="tab-walkthrough" class="tab-pane">
+      <!-- Presenter Notes -->
+      <details class="presenter-notes" open>
+        <summary class="presenter-notes-summary">
+          <span>🎤 Presenter Notes (Tab 2: Walkthrough)</span>
+          <span style="font-size:0.8rem; font-weight:normal;">Click to collapse</span>
+        </summary>
+        <div class="presenter-notes-content">
+          <ul>
+            <li><strong>Demonstrating Mechanism:</strong> Both sides run identical 4-frame physical memories in lockstep over the same 20-reference string. Left is standard LRU; Right has speculative prefetching.</li>
+            <li><strong>Scenario 1 ("Prefetching Helps"):</strong> Cyclic traversal over 6 pages (A-F) causes standard LRU to thrash with 20 misses. Markov prefetching predicts successors, slashing misses from 20 to 7 (65% fewer).</li>
+            <li><strong>Scenario 2 ("Pollution & Fixes"):</strong> Shows how speculative wrong prefetches on infrequent distractor page E displace hot working set pages, doubling page faults from 6 to 12.</li>
+            <li><strong>Interactive Demo:</strong> Toggle LRU-end insertion or set the slider to T=0.40 to see how each one cuts the extra faults (12 with MRU, 7 with LRU-end, 6 with T=0.40).</li>
+          </ul>
+        </div>
+      </details>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+          <div>
+            <h2 class="section-title" id="wt-scen-title">Concept Walkthrough: Lockstep 4-Frame Cache</h2>
+            <p id="wt-scen-desc" style="color:var(--text-muted); font-size:0.95rem; max-width:850px;"></p>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button id="wt-btn-helps" class="btn btn-primary">Scenario 1: Prefetching Helps</button>
+            <button id="wt-btn-pollution" class="btn btn-secondary">Scenario 2: Pollution & Fixes</button>
+          </div>
+        </div>
+
+        <!-- Verification banner -->
+        <div id="wt-verified-box" style="margin-bottom:16px;"></div>
+
+        <!-- Reference tape -->
+        <div class="control-label">Access Sequence Reference Tape:</div>
+        <div id="wt-ref-tape" class="ref-tape"></div>
+
+        <!-- Step Controls Bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px; background-color:var(--surface-alt); border-radius:6px; border:1px solid var(--border-color); margin-bottom:16px;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button id="wt-btn-step" class="btn btn-primary">Step ➔</button>
+            <button id="wt-btn-back" class="btn btn-secondary">⬅ Back</button>
+            <button id="wt-btn-play" class="btn btn-secondary">▶ Play</button>
+            <button id="wt-btn-reset" class="btn btn-secondary">↺ Reset</button>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="control-label">Speed:</span>
+              <input type="range" id="wt-speed" min="400" max="2500" step="100" value="1200" style="width:100px;">
+              <span id="wt-speed-val" style="font-family:var(--font-mono); font-size:0.85rem;">1.2s</span>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="control-label">Degree (k):</span>
+              <select id="wt-k" class="form-select" style="padding:4px 8px;">
+                <option value="1">k = 1</option>
+                <option value="2" selected>k = 2</option>
+                <option value="3">k = 3</option>
+              </select>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="control-label">Insertion:</span>
+              <select id="wt-insertion" class="form-select" style="padding:4px 8px;">
+                <option value="mru" selected>MRU (Standard)</option>
+                <option value="lru">LRU-End (Protected)</option>
+              </select>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="control-label">Threshold T:</span>
+              <input type="range" id="wt-threshold" min="0.0" max="0.5" step="0.05" value="0.0" style="width:80px;">
+              <span id="wt-thresh-val" style="font-family:var(--font-mono); font-size:0.85rem;">0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step narration -->
+        <div id="wt-narration" class="walkthrough-step-narration"></div>
+
+        <!-- Two RAM Boxes Side-by-Side & Markov Table -->
+        <div class="grid-2" style="margin-top:16px;">
+          <!-- Left RAM: Demand LRU -->
+          <div class="ram-box baseline-side">
+            <div class="ram-box-header">
+              <span class="ram-box-title">Left: Demand LRU (Baseline)</span>
+              <span id="wt-base-faults" class="ram-fault-counter" style="color:var(--color-baseline);">Faults: 0</span>
+            </div>
+            <div class="control-label" style="margin-bottom:6px;">Physical Frames (MRU ➔ LRU):</div>
+            <div id="wt-base-frames" class="frames-strip"></div>
+            <div style="font-size:0.85rem; color:var(--text-muted);">Standard demand paging: misses wait for I/O; hits promote to MRU.</div>
+          </div>
+
+          <!-- Right RAM: Markov Prefetching -->
+          <div class="ram-box prefetch-side">
+            <div class="ram-box-header">
+              <span class="ram-box-title">Right: Markov Prefetching</span>
+              <span id="wt-pref-faults" class="ram-fault-counter" style="color:var(--color-prefetch);">Faults: 0</span>
+            </div>
+            <div class="control-label" style="margin-bottom:6px;">Physical Frames (MRU ➔ LRU):</div>
+            <div id="wt-pref-frames" class="frames-strip"></div>
+            <div style="font-size:0.85rem; color:var(--text-muted);">Speculative prefetching: predicts future pages on demand miss.</div>
+          </div>
+        </div>
+
+        <!-- Markov Table display -->
+        <div style="margin-top:20px;">
+          <div class="control-label" style="margin-bottom:6px;">Active Markov Transition Probability Table:</div>
+          <div id="wt-markov-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: LIVE SIMULATOR (Full 3.78M Trace)                                  -->
+    <!-- ========================================================================= -->
+    <section id="tab-live" class="tab-pane">
+      <!-- Presenter Notes -->
+      <details class="presenter-notes" open>
+        <summary class="presenter-notes-summary">
+          <span>🎤 Presenter Notes (Tab 3: Live Simulator)</span>
+          <span style="font-size:0.8rem; font-weight:normal;">Click to collapse</span>
+        </summary>
+        <div class="presenter-notes-content">
+          <ul>
+            <li><strong>Zero Pre-baked Fiction:</strong> This runs the authentic 3,780,309 memory references of Trace A in a background Web Worker in ~0.1 seconds using an O(1) typed-array doubly-linked list.</li>
+            <li><strong>Verified Badge:</strong> A green badge appears when the active configuration matches paper experiments (e.g. 57,512 faults for Top-3 Markov at 1,024 frames).</li>
+            <li><strong>Demonstrating the 512-Frame Defect:</strong> Clicking "512 frames: Top-3 hurts" shows that ungated Top-3 prefetching raises faults at 512 frames (-7.26%). Then clicking "Fix 2: LRU-end" or "Fix 3: Adaptive" shows how each fix turns the loss into a gain.</li>
+            <li><strong>COA EAT Calculator:</strong> Shows effective memory access time speedup and lets students slide prefetch bus cost up to see how background bandwidth overhead impacts net gain.</li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- Preset Buttons Strip -->
+      <div class="card" style="padding:16px 20px;">
+        <div class="control-label" style="margin-bottom:8px;">Live Experiment Presets:</div>
+        <div class="preset-bar">
+          <button id="preset-baseline" class="btn btn-secondary btn-sm">Baseline LRU</button>
+          <button id="preset-top3" class="btn btn-primary btn-sm">Top-3 Markov (paper)</button>
+          <button id="preset-top5" class="btn btn-secondary btn-sm">Top-5 (pollution)</button>
+          <button id="preset-512-hurts" class="btn btn-secondary btn-sm">512 frames: Top-3 hurts</button>
+          <button id="preset-fix1" class="btn btn-secondary btn-sm">Fix 1: confidence T=0.10</button>
+          <button id="preset-fix2" class="btn btn-secondary btn-sm">Fix 2: LRU-end insertion (512)</button>
+          <button id="preset-fix3" class="btn btn-secondary btn-sm">Fix 3: Adaptive Top-K (512)</button>
+          <button id="preset-oracle" class="btn btn-secondary btn-sm">Graph oracle</button>
+        </div>
+      </div>
+
+      <!-- Controls & Execution -->
+      <div class="card">
+        <div class="controls-grid">
+          <!-- RAM Capacity -->
+          <div class="control-group">
+            <label class="control-label" for="sim-capacity">RAM Capacity (Frames)</label>
+            <select id="sim-capacity" class="form-select">
+              <option value="256">256 frames (1 MB)</option>
+              <option value="512">512 frames (2 MB)</option>
+              <option value="1024" selected>1,024 frames (4 MB)</option>
+              <option value="2048">2,048 frames (8 MB)</option>
+              <option value="custom">Custom...</option>
+            </select>
+            <input type="number" id="sim-capacity-custom" class="form-input" style="display:none; margin-top:4px;" min="64" max="4096" value="1024" placeholder="Frame count">
+          </div>
+
+          <!-- Prefetch Degree k -->
+          <div class="control-group" id="sim-k-group">
+            <label class="control-label" for="sim-k">Prefetch Degree (k)</label>
+            <select id="sim-k" class="form-select">
+              <option value="0">k = 0 (No Prefetch)</option>
+              <option value="1">k = 1</option>
+              <option value="2">k = 2</option>
+              <option value="3" selected>k = 3 (default)</option>
+              <option value="4">k = 4</option>
+              <option value="5">k = 5 (Pollution)</option>
+            </select>
+          </div>
+
+          <!-- Model -->
+          <div class="control-group">
+            <label class="control-label" for="sim-model">Prefetch Model</label>
+            <select id="sim-model" class="form-select">
+              <option value="markov" selected>1st-Order Markov</option>
+              <option value="oracle">Graph Oracle</option>
+            </select>
+          </div>
+
+          <!-- Confidence Threshold T -->
+          <div class="control-group">
+            <label class="control-label" for="sim-threshold">Confidence Threshold (T)</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="range" id="sim-threshold" min="0.0" max="0.5" step="0.05" value="0.0" style="flex:1;">
+              <span id="sim-threshold-val" style="font-family:var(--font-mono); font-weight:700;">0.00</span>
+            </div>
+            <div id="sim-threshold-note" class="stat-subtext" style="display:none; margin-top:4px;">T does not apply to the oracle (it has no probabilities).</div>
+          </div>
+
+          <!-- Insertion Position -->
+          <div class="control-group">
+            <label class="control-label" for="sim-insertion">Insertion Position</label>
+            <select id="sim-insertion" class="form-select">
+              <option value="mru" selected>MRU (Standard)</option>
+              <option value="lru">LRU-End</option>
+            </select>
+          </div>
+
+          <!-- Adaptive Top-K Controller -->
+          <div class="control-group">
+            <label class="control-label">Adaptive Top-K</label>
+            <div class="toggle-wrapper">
+              <label class="switch">
+                <input type="checkbox" id="sim-adaptive">
+                <span class="slider"></span>
+              </label>
+              <span style="font-size:0.9rem; font-weight:600;">Closed-Loop Feedback</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Run & Cancel buttons -->
+        <div style="display:flex; align-items:center; gap:12px; margin-top:12px;">
+          <button id="sim-run-btn" class="btn btn-primary" style="min-width:180px;">⚡ Run Full Simulation</button>
+          <button id="sim-cancel-btn" class="btn btn-danger" disabled>✖ Cancel</button>
+          <span id="sim-progress-text" style="font-size:0.9rem; color:var(--text-muted);">Trace A (3,780,309 accesses ready)</span>
+        </div>
+
+        <!-- Progress bar -->
+        <div id="sim-progress-box" class="progress-container">
+          <div id="sim-progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- Results Grid -->
+      <div class="grid-4" style="margin-bottom:20px;">
+        <div class="stat-card">
+          <div class="stat-label">Demand Page Faults</div>
+          <div id="res-faults" class="stat-value baseline">-</div>
+          <div class="stat-subtext">3,780,309 total accesses</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Page Hit Ratio</div>
+          <div id="res-hit-ratio" class="stat-value baseline">-</div>
+          <div class="stat-subtext">Percentage of memory hits</div>
+        </div>
+
+        <div class="stat-card">
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <div class="stat-label">Fault Reduction</div>
+            <div id="verified-paper-badge" class="verified-badge" style="display:none;">✓ Verified Paper Match</div>
+          </div>
+          <div id="res-reduction" class="stat-value prefetch">-</div>
+          <div id="res-adaptive-info" class="stat-subtext">vs Baseline Demand LRU</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Prefetch Accuracy</div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+            <span style="font-size:0.85rem; color:var(--text-muted);">Precision:</span>
+            <span id="res-precision" style="font-family:var(--font-mono); font-weight:700;">-</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span style="font-size:0.85rem; color:var(--text-muted);">Waste (Evicted Unused):</span>
+            <span id="res-waste" style="font-family:var(--font-mono); font-weight:700; color:var(--color-harm);">-</span>
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-faint); margin-top:4px;">Total Prefetches: <span id="res-prefetches">-</span></div>
+        </div>
+      </div>
+
+      <!-- Timeline Chart -->
+      <div class="card">
+        <div class="card-title">
+          <span>Faults per 50,000 References Over Time</span>
+          <span style="font-size:0.85rem; font-weight:normal; color:var(--text-muted);">Solid Line: Current Run | Dashed Gray: Baseline | Dotted Green: Degree k</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="sim-timeline-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Side-by-Side Comparison History Table -->
+      <div class="card">
+        <div class="card-title">
+          <span>Live Experiment Comparison Table (Last 10 Runs)</span>
+          <button id="clear-history-btn" class="btn btn-secondary btn-sm">Clear History</button>
+        </div>
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Configuration</th>
+                <th>Page Faults</th>
+                <th>Fault Reduction</th>
+                <th>Prefetches</th>
+                <th>Precision</th>
+                <th>Waste</th>
+                <th>Sim Time</th>
+              </tr>
+            </thead>
+            <tbody id="comparison-table-body">
+              <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No runs executed yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- COA Effective Access Time (EAT) Calculator -->
+      <div class="eat-calc-box">
+        <div class="card-title" style="margin-bottom:8px;">
+          <span>COA Effective Access Time (EAT) Calculator</span>
+          <span class="tag-badge">Computer Architecture Metric</span>
+        </div>
+
+        <div class="eat-calc-formula">
+          EAT = (1 - f) × t<sub>mem</sub> + f × t<sub>fault</sub> + cost<sub>prefetch</sub><br>
+          <span style="font-size:0.8rem; color:var(--text-muted);">where f = page fault rate (faults / total accesses).</span>
+        </div>
+
+        <div class="controls-grid" style="margin-bottom:12px;">
+          <div class="control-group">
+            <label class="control-label" for="eat-mem-time">Memory Access Time (t<sub>mem</sub>)</label>
+            <input type="number" id="eat-mem-time" class="form-input" value="100" min="10" max="1000" step="10">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Nanoseconds (ns) • Default: 100 ns</span>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="eat-fault-time">Page Fault Service Time (t<sub>fault</sub>)</label>
+            <input type="number" id="eat-fault-time" class="form-input" value="8" min="1" max="50" step="1">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Milliseconds (ms) • Default: 8 ms (Disk/SSD I/O)</span>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="eat-prefetch-cost">Prefetch Cost (% of Fault)</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="range" id="eat-prefetch-cost" min="0" max="100" step="1" value="0" style="flex:1;">
+              <span id="eat-prefetch-cost-val" style="font-family:var(--font-mono); font-weight:700;">0%</span>
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-muted);">Bandwidth penalty • Default: 0% (Background I/O)</span>
+          </div>
+        </div>
+
+        <div class="eat-results-grid">
+          <div class="stat-card">
+            <div class="stat-label">Baseline LRU EAT</div>
+            <div id="eat-base-val" class="stat-value baseline">-</div>
+            <div class="stat-subtext">Standard demand paging latency</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Current Configuration EAT</div>
+            <div id="eat-current-val" class="stat-value prefetch">-</div>
+            <div class="stat-subtext">Predictive paging latency</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Effective System Speedup</div>
+            <div id="eat-speedup-val" class="stat-value prefetch">-</div>
+            <div class="stat-subtext">Baseline EAT / Current EAT</div>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top:14px; margin-bottom:0;">
+          <strong>COA Architectural Insight:</strong> Prefetch loads are normally serviced as asynchronous background I/O over DMA bus queues; the research paper does not charge them as CPU-stalling latency (a stated limitation). Slide the "Prefetch Cost" slider up to examine how bus congestion attenuates speedup gains.
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: EXPERIMENTS (Results of E1 - E11)                                  -->
+    <!-- ========================================================================= -->
+    <section id="tab-experiments" class="tab-pane">
+      <!-- Presenter Notes -->
+      <details class="presenter-notes" open>
+        <summary class="presenter-notes-summary">
+          <span>🎤 Presenter Notes (Tab 4: Experiments)</span>
+          <span style="font-size:0.8rem; font-weight:normal;">Click to collapse</span>
+        </summary>
+        <div class="presenter-notes-content">
+          <ul>
+            <li><strong>Complete Empirical Record:</strong> Summarizes all 11 experiments conducted across both trace sets (both are parallel BFS traces; Trace B also records which thread made each access).</li>
+            <li><strong>Honest Negative Results:</strong> 2nd-order Markov (E2, 403,006 states) and per-thread Markov (E9) did worse than the simpler models, and ARC (E7) gave no gain; its parameter p stayed at 0. We did not test why the first two do worse.</li>
+            <li><strong>Close to the Graph Oracle:</strong> In E8 the Markov table (57,512 faults) is 282 faults from the graph oracle (57,230). Its saving of 10,184 faults is 97.3% of the oracle's saving of 10,466. The oracle is a reference point, not a proven upper bound.</li>
+            <li><strong>Live Simulation Link:</strong> For runnable experiments (E1, E3, E4, E5, E6, E8), click "Run Live in Simulator" to seamlessly simulate the exact configuration in Tab 3.</li>
+          </ul>
+        </div>
+      </details>
+
+      <div class="exp-layout">
+        <!-- Left Nav List of E1 - E11 -->
+        <div class="exp-nav-list" id="exp-nav-list"></div>
+
+        <!-- Right Detail Panel -->
+        <div class="card" id="exp-detail-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <div>
+              <h2 class="section-title" id="exp-detail-title" style="font-size:1.3rem;">Experiment Details</h2>
+              <span id="exp-trace-tag" class="tag-badge">Trace A</span>
+            </div>
+            <button id="exp-run-live-btn" class="btn btn-primary btn-sm" style="display:none;">⚡ Run Live in Simulator</button>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div class="control-label" style="margin-bottom:4px;">What We Tested:</div>
+            <p id="exp-tested-text" style="color:var(--text-main); font-size:1rem;"></p>
+          </div>
+
+          <!-- Chart container -->
+          <div class="chart-container" style="height:220px;">
+            <canvas id="exp-chart-canvas"></canvas>
+          </div>
+
+          <!-- Table Container -->
+          <div class="data-table-wrapper" id="exp-table-container" style="margin-bottom:16px;"></div>
+
+          <div class="callout" style="margin-bottom:0;">
+            <div class="control-label" style="margin-bottom:4px;">What We Found:</div>
+            <p id="exp-found-text" style="color:var(--text-main); font-size:1rem;"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 5: TAKEAWAYS & LIMITS                                                 -->
+    <!-- ========================================================================= -->
+    <section id="tab-takeaways" class="tab-pane">
+      <!-- Presenter Notes -->
+      <details class="presenter-notes" open>
+        <summary class="presenter-notes-summary">
+          <span>🎤 Presenter Notes (Tab 5: Conclusions)</span>
+          <span style="font-size:0.8rem; font-weight:normal;">Click to collapse</span>
+        </summary>
+        <div class="presenter-notes-content">
+          <ul>
+            <li><strong>Summary for Evaluation Panel:</strong> 1st-order Markov prefetching achieves a 15.04% fault reduction on irregular graph BFS workloads, but naive prefetching causes severe cache pollution under constrained memory (-7.26%).</li>
+            <li><strong>The Three Solutions:</strong> We developed confidence thresholding (+17.65%), LRU-end insertion (+13.54%), and adaptive feedback control (+4.29% at 512 frames); LRU-end insertion and adaptive control both turn the 512-frame loss into a gain.</li>
+            <li><strong>Transparent Scientific Integrity:</strong> We documented negative results (2nd-order, per-thread, ARC) and stated clear project limitations (single BFS workload, fully associative software cache model, offline threshold tuning).</li>
+          </ul>
+        </div>
+      </details>
+
+      <div class="grid-2">
+        <!-- 5 Bullet Takeaways -->
+        <div class="card">
+          <div class="card-title">
+            <span>5 Core Project Takeaways</span>
+            <span class="tag-badge">Conclusions</span>
+          </div>
+          <ul style="padding-left:20px; line-height:1.7; font-size:1rem;">
+            <li><strong>Top-3 is the Best Degree Tested:</strong> At 1,024 frames, degree k=3 cuts page faults by <strong>15.04%</strong> (67,696 → 57,512). Top-5 saves less (+6.88%); one possible cause is that extra low-probability pages displace resident ones, which we did not test.</li>
+            <li><strong>Ungated Prefetching Can Raise Faults:</strong> At 512 frames, ungated Top-3 with MRU insertion increases faults by <strong>7.26%</strong> (221,603 → 237,684). In this run, prefetching without pollution control made things worse.</li>
+            <li><strong>Three Orthogonal Solutions Address Pollution:</strong>
+              <ul style="margin-top:4px; margin-bottom:4px; padding-left:16px;">
+                <li><em>Confidence Filter (T=0.10):</em> Prunes low-probability transitions, yielding peak <strong>+17.65%</strong> reduction with 7,382 fewer prefetches.</li>
+                <li><em>LRU-End Insertion:</em> Places speculative pages at the LRU position, turning a -7.26% loss at 512 frames into a <strong>+13.54% gain</strong>.</li>
+                <li><em>Adaptive Top-K Controller:</em> Dynamically throttles k when waste exceeds 50%, rescuing constrained memory autonomously (+4.29% gain).</li>
+              </ul>
+            </li>
+            <li><strong>Negative Results:</strong> 2nd-order Markov did worse than baseline at k=2, 3 and 5 (403,006 states); per-thread models did worse than the global model; ARC gave no benefit over LRU. The causes were not tested.</li>
+            <li><strong>Markov Table Close to the Graph Oracle:</strong> Top-3 Markov gives 57,512 faults against 57,230 for the graph oracle, which is 97.3% of the oracle's saving (10,184 of 10,466 faults). The oracle is built from the whole graph with page numbers copied from this trace's layout, so it is not independent.</li>
+          </ul>
+        </div>
+
+        <!-- Stated Project Limitations -->
+        <div class="card">
+          <div class="card-title">
+            <span>Experimental Limitations</span>
+            <span class="tag-badge">Scientific Rigor</span>
+          </div>
+          <ul style="padding-left:20px; line-height:1.7; font-size:1rem; color:var(--text-muted);">
+            <li><strong>Single Workload & Graph Topology:</strong> Evaluated exclusively on parallel BFS over the SNAP Amazon0302 co-purchasing graph (262,111 vertices, 1,234,877 edges). Behavior on power-law social networks or DFS traversals may differ.</li>
+            <li><strong>Fully Associative Software Simulator:</strong> Implemented a fully associative software LRU cache. Real hardware L1/L2/L3 caches and TLB structures are set-associative with collision conflict misses.</li>
+            <li><strong>Uncharged Background I/O Overhead:</strong> Demand faults stall CPU execution, but prefetch I/O bandwidth and memory bus saturation are not charged as latency penalties in the simulator.</li>
+            <li><strong>Threshold Tuning on Test Trace:</strong> Confidence threshold T=0.10 was evaluated on the test trace; dynamic online confidence estimation was not integrated.</li>
+            <li><strong>Fixes Evaluated Separately:</strong> The three pollution fixes (thresholding, LRU-end insertion, adaptive control) were evaluated independently rather than in an integrated compound architecture.</li>
+            <li><strong>Two Distinct Trace Datasets:</strong> Trace A (Experiments 1–8) and Trace B (Experiments 9–11) are two separate runs of the same parallel BFS and differ by about 1% because of OpenMP scheduling: baseline LRU at 1,024 frames has 67,696 faults on Trace A and 66,979 on Trace B. Trace B also records thread numbers and write flags, which E9-E11 need.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- How to Run & File Structure -->
+      <div class="card">
+        <div class="card-title">
+          <span>How to Run & Repository Structure</span>
+          <span class="tag-badge">Terminal & Scripts</span>
+        </div>
+
+        <div class="callout" style="margin-bottom:16px;">
+          <strong>Starting the Local Presentation Server:</strong><br>
+          Run <code>run_ui.bat</code> inside the <code>ui/</code> folder (or run <code>python -m http.server 8000</code> inside <code>ui/</code> and open <code>http://localhost:8000</code>).
+        </div>
+
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>File / Component</th>
+                <th>Role & Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>ui/index.html</code></td>
+                <td>Plain HTML5 multi-tabbed classroom presentation UI (5 tabs, light/dark mode).</td>
+              </tr>
+              <tr>
+                <td><code>ui/css/styles.css</code></td>
+                <td>High-contrast presentation styles optimized for classroom projector readability.</td>
+              </tr>
+              <tr>
+                <td><code>ui/js/sim_core.js</code></td>
+                <td>Unified O(1) typed-array LRU simulation core used by both browser and Node.js.</td>
+              </tr>
+              <tr>
+                <td><code>ui/js/worker.js</code></td>
+                <td>Dedicated Web Worker executing the 3.78M-reference trace without freezing the UI.</td>
+              </tr>
+              <tr>
+                <td><code>ui/js/scenarios.js</code></td>
+                <td>Step-by-step teaching scenarios for Tab 2 ("Prefetching helps" & "Pollution").</td>
+              </tr>
+              <tr>
+                <td><code>ui/js/charts.js</code></td>
+                <td>Zero-dependency offline Canvas charting helpers for timelines and experiment bars.</td>
+              </tr>
+              <tr>
+                <td><code>ui/export_ui_data.py</code></td>
+                <td>Data preparation script generating compact binary trace and JSON models.</td>
+              </tr>
+              <tr>
+                <td><code>ui/tests/verify_sim.mjs</code></td>
+                <td>Automated Node.js test suite verifying all 20 reference simulation targets.</td>
+              </tr>
+              <tr>
+                <td><code>ui/tests/verify_scenarios.mjs</code></td>
+                <td>Automated Node.js test suite verifying Tab 2 walkthrough scenarios.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+  <script>if (location.protocol === 'file:') { document.getElementById('file-protocol-warning').style.display = 'block'; }</script>
+</body>
+</html>
+

@@ -1,0 +1,36 @@
+{
+  "trace_a": {
+    "faults_base": 67696,
+    "faults_pref": 57512,
+    "n_pref": 56721,
+    "n_used": 33540,
+    "n_unused": 23149,
+    "n_skipped": 115815,
+    "n_candidates": 172536,
+    "still_resident": 32,
+    "precision": 59.13153858359338,
+    "waste": 40.81204492163396,
+    "total_refs": 3780309
+  },
+  "trace_b": {
+    "faults_base": 66979,
+    "faults_pref": 57512,
+    "dirty_base": 1871,
+    "dirty_pref": 2620,
+    "clean_base": 64084,
+    "clean_pref": 111023,
+    "evictions_base": 65955,
+    "evictions_pref": 113643,
+    "hr_base": 98.22821361957449,
+    "hr_pref": 98.47864288342566,
+    "n_pref": 57155,
+    "n_used": 33397,
+    "n_unused": 23714,
+    "n_skipped": 114913,
+    "n_candidates": 172068,
+    "still_resident": 44,
+    "precision": 58.43233312921004,
+    "waste": 41.49068322981366,
+    "total_refs": 3780309
+  }
+}
